@@ -12,7 +12,9 @@ class BankModule extends EventEmitter {
         // Listeners
         this.on('add', this._addListener);
         this.on('get', this._getListener);
+        this.on('send', this._sendListener);
         this.on('withdraw', this._withdrawListener);
+        this.on('changeLimit', this._changeLimitListener);
         this.on('error', this._errorListener);
     }
 
@@ -49,12 +51,38 @@ class BankModule extends EventEmitter {
         }
     }
 
+    _sendListener (personFirstId, personSecondId, amount) {
+        const firstUser = this._getUser(personFirstId);
+        const secondUser = this._getUser(personSecondId);
+        amount = this._validateAmount(amount);
+
+        if (amount) {
+            if (this._removeAmount(firstUser, amount)) {
+                this._addAmount(secondUser, amount);
+            }
+        }
+    }
+
     _withdrawListener (personId, amount) {
         const currentUser = this._getUser(personId);
         amount = this._validateAmount(amount);
 
         if (amount) {
             this._removeAmount(currentUser, amount);
+        }
+    }
+
+    _changeLimitListener (personId, cb) {
+        const currentUser = this._getUser(personId);
+        cb = this._validateCallBack(cb);
+
+        if (cb) {
+            this._testLimitCallBack(cb);
+            currentUser.limit = cb;
+
+            this.users = this.users.map(
+                user => user.id === currentUser.id ? currentUser : user
+            );
         }
     }
 
@@ -77,10 +105,16 @@ class BankModule extends EventEmitter {
     }
 
     _removeAmount (currentUser, amount) {
+        if (!currentUser.limit(amount, currentUser.balance, currentUser.balance - amount)) {
+            this.emit(
+                'error',
+                new Error(`User over limit: ${currentUser.id}`)
+            );
+        }
         if ((currentUser.balance - amount) < 0) {
             this.emit(
                 'error',
-                new TypeError(`Unable to remove the amount from user: ${personId}`)
+                new TypeError(`Unable to remove the amount from user: ${currentUser.id}`)
             );
         } else {
             currentUser.balance -= amount;
@@ -121,6 +155,22 @@ class BankModule extends EventEmitter {
         return cb;
     }
 
+    _testLimitCallBack (cb) {
+        let result;
+
+        try {
+            result = cb(100, 200, 100);
+        } catch (error) {
+            throw error;
+        }
+
+        if (typeof result !== 'boolean') {
+            throw new TypeError(
+                'limit callback must return boolean'
+            );
+        }
+    }
+
     _validateAmount (amount) {
         if (typeof amount !== 'number' || amount <= 0) {
             this.emit(
@@ -154,7 +204,7 @@ class BankModule extends EventEmitter {
         }
     }
 
-    _validateUser ({ name, balance }) {
+    _validateUser ({ name, balance, limit }) {
         if (!name || typeof name !== 'string') {
             throw new TypeError(
                 'name does not exist or contains not a valid data type'
@@ -164,6 +214,12 @@ class BankModule extends EventEmitter {
         if (typeof balance !== 'number') {
             throw new TypeError(
                 'balance does not exist or contains not a valid data type'
+            );
+        }
+
+        if (typeof limit !== 'function') {
+            throw new TypeError(
+                'limit does not exist or contains not a valid data type'
             );
         }
     }

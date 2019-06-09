@@ -20,7 +20,7 @@ class BankModule extends EventEmitter {
     register (user) {
         this._validateUser(user);
         this._checkExistence(user.name);
-        this._checkBalance(user.balance);
+        this._validateBalance(user.balance);
 
         const id = crypto.randomBytes(16).toString('hex');
 
@@ -149,7 +149,7 @@ class BankModule extends EventEmitter {
         return amount;
     }
 
-    _checkBalance (balance) {
+    _validateBalance (balance) {
         if (balance <= 0) {
             throw new Error(
                 'Unable to add user with negative or zero balance'
@@ -181,23 +181,3 @@ class BankModule extends EventEmitter {
         }
     }
 }
-
-const bank = new BankModule();
-const personFirstId = bank.register({
-    name: 'Pitter Black',
-    balance: 100
-});
-const personSecondId = bank.register({
-    name: 'Oliver White',
-    balance: 700
-});
-bank.emit('get', personFirstId, (balance) => {
-    console.log(`I have ${balance}₴`); // I have 750₴
-});
-bank.emit('get', personSecondId, (balance) => {
-    console.log(`I have ${balance}₴`); // I have 750₴
-});
-bank.emit('send', personFirstId, personSecondId, 50);
-bank.emit('get', personSecondId, (balance) => {
-    console.log(`I have ${balance}₴`); // I have 750₴
-});
